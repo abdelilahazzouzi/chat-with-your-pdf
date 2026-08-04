@@ -41,17 +41,81 @@ If the user asks something outside the scope of the document, politely inform th
     // 1. GOOGLE GEMINI PROVIDER (via Google REST API on Cloudflare Edge)
     // ---------------------------------------------------------
     if (provider === "gemini") {
-      const FALLBACK_KEY = atob("QVEuQWI4Uk42SVc2TTdDdVByRGJESE1zdXlKNFFpeVdGSHVsdERiVkpwNzZNMDhYLVZxdnc=");
-      const apiKey = customApiKey || env.GEMINI_API_KEY || FALLBACK_KEY;
+      const apiKey = customApiKey || env.GEMINI_API_KEY;
 
+      // Helper: stream via OpenRouter free model (no API key required)
+      const streamViaOpenRouter = async (pdfTextContent?: string): Promise<Response> => {
+        const orModel = "google/gemini-2.0-flash-lite-preview:free";
+        const orUrl = "https://openrouter.ai/api/v1/chat/completions";
+
+        let enhancedSystemPrompt = systemPrompt;
+        if (pdfTextContent && pdfTextContent.length > 0) {
+          enhancedSystemPrompt += `\n\n--- EXTRACTED PDF DOCUMENT CONTENT ---\n${pdfTextContent.slice(0, 40000)}\n--- END DOCUMENT ---`;
+        }
+
+        const msgs: Array<{ role: string; content: string }> = [
+          { role: "system", content: enhancedSystemPrompt },
+        ];
+        for (const item of history) {
+          msgs.push({ role: item.role === "user" ? "user" : "assistant", content: item.content });
+        }
+        msgs.push({ role: "user", content: message });
+
+        const orRes = await fetch(orUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://chat-with-your-pdf.pages.dev",
+            "X-Title": "Chat With Your PDF",
+          },
+          body: JSON.stringify({ model: orModel, messages: msgs, stream: true }),
+        });
+
+        if (!orRes.ok || !orRes.body) {
+          const errText = await orRes.text().catch(() => "Unknown error");
+          return new Response(
+            JSON.stringify({ error: `Error (${orRes.status}): ${errText}` }),
+            { status: orRes.status, headers: { "Content-Type": "application/json" } }
+          );
+        }
+
+        const enc = new TextEncoder();
+        const dec = new TextDecoder();
+        const rdr = orRes.body.getReader();
+        const stream = new ReadableStream({
+          async start(ctrl) {
+            let buf = "";
+            try {
+              while (true) {
+                const { done, value } = await rdr.read();
+                if (done) break;
+                buf += dec.decode(value, { stream: true });
+                const lines = buf.split("\n");
+                buf = lines.pop() || "";
+                for (const line of lines) {
+                  const t = line.trim();
+                  if (t === "data: [DONE]") continue;
+                  if (t.startsWith("data: ")) {
+                    try {
+                      const json = JSON.parse(t.slice(6));
+                      const chunk = json.choices?.[0]?.delta?.content;
+                      if (chunk) ctrl.enqueue(enc.encode(chunk));
+                    } catch {}
+                  }
+                }
+              }
+              ctrl.close();
+            } catch (err) { ctrl.error(err); }
+          },
+        });
+        return new Response(stream, {
+          headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-cache" },
+        });
+      };
+
+      // If no valid Gemini key, go straight to free OpenRouter fallback
       if (!apiKey) {
-        return new Response(
-          JSON.stringify({
-            error:
-              "GEMINI_API_KEY is missing. Please add your API key in Cloudflare environment variables or in the Model Settings modal.",
-          }),
-          { status: 400, headers: { "Content-Type": "application/json" } }
-        );
+        return streamViaOpenRouter(body.pdfText);
       }
 
       const modelCandidates = Array.from(new Set([targetModel, ...GEMINI_FALLBACK_MODELS]));
@@ -60,54 +124,33 @@ If the user asks something outside the scope of the document, politely inform th
       for (const modelName of modelCandidates) {
         const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:streamGenerateContent?alt=sse&key=${apiKey}`;
 
-        // Format contents
         const contents: any[] = [];
-
         if (pdfBase64 && history.length === 0) {
           contents.push({
             role: "user",
             parts: [
-              {
-                inline_data: {
-                  mime_type: "application/pdf",
-                  data: pdfBase64,
-                },
-              },
+              { inline_data: { mime_type: "application/pdf", data: pdfBase64 } },
               { text: "Here is the PDF document for our discussion. Please analyze it and prepare to answer my questions." },
             ],
           });
-          contents.push({
-            role: "model",
-            parts: [{ text: "I have read and indexed the PDF document. What questions do you have about it?" }],
-          });
+          contents.push({ role: "model", parts: [{ text: "I have read and indexed the PDF document. What questions do you have about it?" }] });
         } else {
           for (const item of history) {
-            contents.push({
-              role: item.role === "user" ? "user" : "model",
-              parts: [{ text: item.content }],
-            });
+            contents.push({ role: item.role === "user" ? "user" : "model", parts: [{ text: item.content }] });
           }
         }
-
-        contents.push({
-          role: "user",
-          parts: [{ text: message }],
-        });
+        contents.push({ role: "user", parts: [{ text: message }] });
 
         const geminiRes = await fetch(geminiUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            system_instruction: { parts: [{ text: systemPrompt }] },
-            contents,
-          }),
+          body: JSON.stringify({ system_instruction: { parts: [{ text: systemPrompt }] }, contents }),
         });
 
         if (geminiRes.ok && geminiRes.body) {
           const reader = geminiRes.body.getReader();
           const decoder = new TextDecoder();
           const encoder = new TextEncoder();
-
           const stream = new ReadableStream({
             async start(controller) {
               let buffer = "";
@@ -115,55 +158,43 @@ If the user asks something outside the scope of the document, politely inform th
                 while (true) {
                   const { done, value } = await reader.read();
                   if (done) break;
-
                   buffer += decoder.decode(value, { stream: true });
                   const lines = buffer.split("\n");
                   buffer = lines.pop() || "";
-
                   for (const line of lines) {
                     const trimmed = line.trim();
                     if (trimmed.startsWith("data: ")) {
                       try {
                         const json = JSON.parse(trimmed.slice(6));
                         const textChunk = json.candidates?.[0]?.content?.parts?.[0]?.text;
-                        if (textChunk) {
-                          controller.enqueue(encoder.encode(textChunk));
-                        }
+                        if (textChunk) controller.enqueue(encoder.encode(textChunk));
                       } catch {}
                     }
                   }
                 }
                 controller.close();
-              } catch (err) {
-                controller.error(err);
-              }
+              } catch (err) { controller.error(err); }
             },
           });
-
           return new Response(stream, {
-            headers: {
-              "Content-Type": "text/plain; charset=utf-8",
-              "Cache-Control": "no-cache",
-            },
+            headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-cache" },
           });
         } else {
           lastErrorText = await geminiRes.text();
-          if (geminiRes.status === 404) {
-            console.warn(`Gemini model ${modelName} returned 404, trying next fallback...`);
-            continue;
-          }
+          if (geminiRes.status === 404) { continue; }
           break;
         }
       }
 
-      if (lastErrorText.includes("429") || lastErrorText.includes("RESOURCE_EXHAUSTED") || lastErrorText.includes("prepayment")) {
-        return new Response(
-          JSON.stringify({
-            error:
-              "Your Gemini Project Prepayment Credits are depleted ($0 balance on a paid GCP project). To use Gemini 100% FREE with no credit card: Open https://aistudio.google.com/app/apikey -> Click 'Create API key in NEW project' -> Paste your free key in Model Settings.",
-          }),
-          { status: 429, headers: { "Content-Type": "application/json" } }
-        );
+      // On 429/quota exhaustion, silently fall through to free OpenRouter model
+      const isExhausted =
+        lastErrorText.includes("429") ||
+        lastErrorText.includes("RESOURCE_EXHAUSTED") ||
+        lastErrorText.includes("prepayment") ||
+        lastErrorText.includes("quota");
+
+      if (isExhausted) {
+        return streamViaOpenRouter(body.pdfText);
       }
 
       return new Response(
