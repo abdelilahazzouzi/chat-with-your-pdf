@@ -161,9 +161,11 @@ If the user asks something outside the scope of the document, politely inform th
       );
     }
 
-    // ---------------------------------------------------------
-    // 2. OPENAI-COMPATIBLE PROVIDERS (Kimi, Qwen, DeepSeek, etc.)
-    // ---------------------------------------------------------
+    let effectiveModel = targetModel;
+    if (provider === "kimi" && (targetModel === "kimi-k1.5" || !targetModel.startsWith("moonshot-v1-"))) {
+      effectiveModel = "moonshot-v1-8k";
+    }
+
     let apiKey = customApiKey;
     let endpointUrl = customBaseUrl;
 
@@ -182,15 +184,22 @@ If the user asks something outside the scope of the document, politely inform th
       const providerName = provider.toUpperCase();
       return NextResponse.json(
         {
-          error: `API Key for ${providerName} is missing. Please provide a key in the Model Settings modal.`,
+          error: `API Key for ${providerName} is missing. Click the model indicator in the Navbar to open Settings and paste your ${providerName} API key.`,
         },
         { status: 400 }
       );
     }
 
+    // Build system prompt with PDF text context for non-Gemini providers
+    let enhancedSystemPrompt = systemPrompt;
+    const pdfText = body.pdfText;
+    if (pdfText && pdfText.length > 0) {
+      enhancedSystemPrompt += `\n\n--- EXTRACTED PDF DOCUMENT CONTENT ---\n${pdfText.slice(0, 40000)}\n--- END DOCUMENT ---`;
+    }
+
     // Prepare OpenAI format messages
     const messagesPayload: Array<{ role: string; content: string }> = [
-      { role: "system", content: systemPrompt },
+      { role: "system", content: enhancedSystemPrompt },
     ];
 
     // Reconstruct conversation history
@@ -214,7 +223,7 @@ If the user asks something outside the scope of the document, politely inform th
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: targetModel,
+        model: effectiveModel,
         messages: messagesPayload,
         stream: true,
       }),
@@ -222,8 +231,14 @@ If the user asks something outside the scope of the document, politely inform th
 
     if (!openAiResponse.ok) {
       const errorText = await openAiResponse.text();
+      let formattedMsg = errorText;
+      try {
+        const errJson = JSON.parse(errorText);
+        formattedMsg = errJson.error?.message || errJson.message || errorText;
+      } catch {}
+
       return NextResponse.json(
-        { error: `${provider.toUpperCase()} API error (${openAiResponse.status}): ${errorText}` },
+        { error: `${provider.toUpperCase()} API Error (${openAiResponse.status}): ${formattedMsg}` },
         { status: openAiResponse.status }
       );
     }

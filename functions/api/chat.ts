@@ -171,9 +171,11 @@ If the user asks something outside the scope of the document, politely inform th
       );
     }
 
-    // ---------------------------------------------------------
-    // 2. OPENAI-COMPATIBLE PROVIDERS (Kimi, Qwen, DeepSeek, etc.)
-    // ---------------------------------------------------------
+    let effectiveModel = targetModel;
+    if (provider === "kimi" && (targetModel === "kimi-k1.5" || !targetModel.startsWith("moonshot-v1-"))) {
+      effectiveModel = "moonshot-v1-8k";
+    }
+
     let apiKey = customApiKey;
     let endpointUrl = customBaseUrl;
 
@@ -190,13 +192,21 @@ If the user asks something outside the scope of the document, politely inform th
 
     if (!apiKey) {
       return new Response(
-        JSON.stringify({ error: `API Key for ${provider.toUpperCase()} is missing.` }),
+        JSON.stringify({
+          error: `API Key for ${provider.toUpperCase()} is missing. Click the model indicator in the Navbar to open Settings and paste your ${provider.toUpperCase()} API key.`,
+        }),
         { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
 
+    let enhancedSystemPrompt = systemPrompt;
+    const pdfText = body.pdfText;
+    if (pdfText && pdfText.length > 0) {
+      enhancedSystemPrompt += `\n\n--- EXTRACTED PDF DOCUMENT CONTENT ---\n${pdfText.slice(0, 40000)}\n--- END DOCUMENT ---`;
+    }
+
     const messagesPayload: Array<{ role: string; content: string }> = [
-      { role: "system", content: systemPrompt },
+      { role: "system", content: enhancedSystemPrompt },
     ];
 
     for (const item of history) {
@@ -215,7 +225,7 @@ If the user asks something outside the scope of the document, politely inform th
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: targetModel,
+        model: effectiveModel,
         messages: messagesPayload,
         stream: true,
       }),
@@ -223,10 +233,16 @@ If the user asks something outside the scope of the document, politely inform th
 
     if (!openAiResponse.ok) {
       const errText = await openAiResponse.text();
-      return new Response(JSON.stringify({ error: `${provider.toUpperCase()} API error: ${errText}` }), {
-        status: openAiResponse.status,
-        headers: { "Content-Type": "application/json" },
-      });
+      let formattedMsg = errText;
+      try {
+        const errJson = JSON.parse(errText);
+        formattedMsg = errJson.error?.message || errJson.message || errText;
+      } catch {}
+
+      return new Response(
+        JSON.stringify({ error: `${provider.toUpperCase()} API Error (${openAiResponse.status}): ${formattedMsg}` }),
+        { status: openAiResponse.status, headers: { "Content-Type": "application/json" } }
+      );
     }
 
     if (!openAiResponse.body) {

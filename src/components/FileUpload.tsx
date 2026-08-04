@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useRef, ChangeEvent, DragEvent } from "react";
-import { formatFileSize, fileToBase64 } from "@/lib/utils";
+import { formatFileSize, fileToBase64, extractPdfText } from "@/lib/utils";
 
 interface FileUploadProps {
-  onFileSelect: (fileData: { name: string; size: number; base64: string; rawFile: File }) => void;
+  onFileSelect: (fileData: { name: string; size: number; base64: string; text?: string; rawFile: File }) => void;
 }
 
 export default function FileUpload({ onFileSelect }: FileUploadProps) {
@@ -34,8 +34,10 @@ export default function FileUpload({ onFileSelect }: FileUploadProps) {
     setProgress(30);
 
     try {
-      setProgress(60);
+      setProgress(50);
       const base64 = await fileToBase64(file);
+      setProgress(80);
+      const text = await extractPdfText(file);
       setProgress(100);
 
       setTimeout(() => {
@@ -44,6 +46,7 @@ export default function FileUpload({ onFileSelect }: FileUploadProps) {
           name: file.name,
           size: file.size,
           base64,
+          text,
           rawFile: file,
         });
       }, 400);

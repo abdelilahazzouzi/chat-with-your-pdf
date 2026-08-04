@@ -9,7 +9,7 @@ export function useChat() {
   const [error, setError] = useState<string | null>(null);
 
   const sendMessage = useCallback(
-    async (userMessageText: string, pdfBase64?: string) => {
+    async (userMessageText: string, pdfBase64?: string, pdfText?: string) => {
       if (!userMessageText.trim() || isLoading) return;
 
       setError(null);
@@ -61,6 +61,7 @@ export function useChat() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             pdfBase64: pdfBase64 || null,
+            pdfText: pdfText || null,
             history: historyPayload,
             message: userMessageText,
             provider,

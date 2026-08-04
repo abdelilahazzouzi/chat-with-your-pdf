@@ -8,12 +8,15 @@ import FileUpload from "@/components/FileUpload";
 export default function Home() {
   const router = useRouter();
 
-  const handleFileSelect = (fileData: { name: string; size: number; base64: string; rawFile: File }) => {
+  const handleFileSelect = (fileData: { name: string; size: number; base64: string; text?: string; rawFile: File }) => {
     // Store PDF file data in session storage for the chat view
     if (typeof window !== "undefined") {
       sessionStorage.setItem("pdf_name", fileData.name);
       sessionStorage.setItem("pdf_size", fileData.size.toString());
       sessionStorage.setItem("pdf_base64", fileData.base64);
+      if (fileData.text) {
+        sessionStorage.setItem("pdf_text", fileData.text);
+      }
     }
     // Navigate to chat interface
     router.push("/chat");

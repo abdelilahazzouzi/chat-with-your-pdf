@@ -13,7 +13,7 @@ export default function ChatPage() {
   const router = useRouter();
   const { messages, isLoading, error, sendMessage, clearChat } = useChat();
 
-  const [pdfInfo, setPdfInfo] = useState<{ name: string; size: number; base64: string } | null>(null);
+  const [pdfInfo, setPdfInfo] = useState<{ name: string; size: number; base64: string; text?: string } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Load PDF data from sessionStorage on client load
@@ -22,6 +22,7 @@ export default function ChatPage() {
       const name = sessionStorage.getItem("pdf_name");
       const sizeStr = sessionStorage.getItem("pdf_size");
       const base64 = sessionStorage.getItem("pdf_base64");
+      const text = sessionStorage.getItem("pdf_text") || undefined;
 
       if (!name || !base64) {
         // If user navigated directly to /chat without uploading a PDF, redirect to home
@@ -33,6 +34,7 @@ export default function ChatPage() {
         name,
         size: sizeStr ? parseInt(sizeStr, 10) : 0,
         base64,
+        text,
       });
     }
   }, [router]);
@@ -44,7 +46,7 @@ export default function ChatPage() {
 
   const handleSendMessage = (userText: string) => {
     if (!pdfInfo) return;
-    sendMessage(userText, pdfInfo.base64);
+    sendMessage(userText, pdfInfo.base64, pdfInfo.text);
   };
 
   const handleResetPdf = () => {
@@ -52,6 +54,7 @@ export default function ChatPage() {
       sessionStorage.removeItem("pdf_name");
       sessionStorage.removeItem("pdf_size");
       sessionStorage.removeItem("pdf_base64");
+      sessionStorage.removeItem("pdf_text");
     }
     router.push("/");
   };

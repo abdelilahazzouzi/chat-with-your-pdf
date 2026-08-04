@@ -16,6 +16,43 @@ export function fileToBase64(file: File): Promise<string> {
 }
 
 /**
+ * Extracts human-readable plain text strings from a PDF file ArrayBuffer
+ */
+export async function extractPdfText(file: File): Promise<string> {
+  try {
+    const buffer = await file.arrayBuffer();
+    const decoder = new TextDecoder("utf-8");
+    const rawText = decoder.decode(buffer);
+
+    // Extract text blocks enclosed in parenthesis () within PDF stream operators (Tj, TJ, etc.)
+    const textMatches = rawText.match(/\(([^()]{2,})\)\s*(?:Tj|TJ|'|")/g);
+
+    if (textMatches && textMatches.length > 0) {
+      const extracted = textMatches
+        .map((m) => {
+          const inner = m.replace(/^[\s(]+|[\s)\w]+$/g, "").trim();
+          return inner.replace(/\\([()])/g, "$1");
+        })
+        .filter((t) => t.length > 1 && !/^[\d\s\W]+$/.test(t))
+        .join(" ");
+
+      if (extracted.length > 50) {
+        return extracted;
+      }
+    }
+
+    // Fallback regex for plain printable text chunks
+    const fallbackChunks = rawText.match(/[a-zA-Z0-9\s.,;:'"?!(){}\[\]\-]{15,}/g);
+    if (fallbackChunks) {
+      return fallbackChunks.join("\n").slice(0, 30000);
+    }
+  } catch (err) {
+    console.warn("Could not extract raw text from PDF:", err);
+  }
+  return "";
+}
+
+/**
  * Formats byte counts to human-readable strings (e.g. 2.4 MB)
  */
 export function formatFileSize(bytes: number): string {
@@ -39,3 +76,4 @@ export function truncateFileName(name: string, maxLength: number = 24): string {
   }
   return `${name.slice(0, maxLength - 3)}...`;
 }
+
