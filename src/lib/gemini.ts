@@ -91,12 +91,24 @@ export const SUPPORTED_MODELS: AIModelOption[] = [
     description: "Next-generation multimodal Kimi model",
   },
 
-  // Custom / OpenAI Compatible
+  // Free OpenRouter Models (No setup required)
   {
-    id: "deepseek-chat",
-    name: "DeepSeek Chat",
+    id: "google/gemini-2.0-flash-lite-preview:free",
+    name: "Gemini 2.0 Flash (Free)",
     provider: "openai_compatible",
-    description: "DeepSeek reasoning & text model via OpenAI format",
+    description: "100% Free Gemini 2.0 via OpenRouter ($0 balance)",
+  },
+  {
+    id: "qwen/qwen-2.5-72b-instruct:free",
+    name: "Qwen 2.5 72B (Free)",
+    provider: "openai_compatible",
+    description: "100% Free Alibaba Qwen model via OpenRouter",
+  },
+  {
+    id: "deepseek/deepseek-r1:free",
+    name: "DeepSeek R1 (Free)",
+    provider: "openai_compatible",
+    description: "100% Free DeepSeek R1 reasoning model via OpenRouter",
   },
 ];
 
@@ -112,4 +124,5 @@ export interface ChatMessage {
   role: "user" | "model";
   parts: ChatMessagePart[];
 }
+
 

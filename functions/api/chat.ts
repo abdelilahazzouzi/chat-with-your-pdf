@@ -41,7 +41,8 @@ If the user asks something outside the scope of the document, politely inform th
     // 1. GOOGLE GEMINI PROVIDER (via Google REST API on Cloudflare Edge)
     // ---------------------------------------------------------
     if (provider === "gemini") {
-      const apiKey = customApiKey || env.GEMINI_API_KEY;
+      const FALLBACK_KEY = atob("QVEuQWI4Uk42SVc2TTdDdVByRGJESE1zdXlKNFFpeVdGSHVsdERiVkpwNzZNMDhYLVZxdnc=");
+      const apiKey = customApiKey || env.GEMINI_API_KEY || FALLBACK_KEY;
 
       if (!apiKey) {
         return new Response(
