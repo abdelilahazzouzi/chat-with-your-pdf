@@ -207,9 +207,9 @@ export default function ModelSettingsModal({
             </div>
             <div style={{ fontSize: 12, color: "#71717a", marginBottom: 12 }}>
               {activeTab === "gemini"
-                ? "Enter your Google AI Studio API key (starts with 'AIzaSy...'). Overrides .env.local if provided."
+                ? "Enter your Google Gemini API key. Overrides .env.local if provided."
                 : activeTab === "kimi"
-                ? "Enter your Moonshot/Kimi API key (starts with 'sk-...')."
+                ? "Enter your Moonshot/Kimi API key."
                 : activeTab === "qwen"
                 ? "Enter your Alibaba Cloud DashScope API key."
                 : "Enter your OpenAI or Custom API key."}

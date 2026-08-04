@@ -37,18 +37,7 @@ If the user asks something outside the scope of the document, politely inform th
         return NextResponse.json(
           {
             error:
-              "GEMINI_API_KEY is missing. Please add a valid Google AI Studio API key starting with 'AIzaSy...' in .env.local or in the Model Settings modal.",
-          },
-          { status: 400 }
-        );
-      }
-
-      // Check if key looks suspicious (e.g. access token starting with AQ...)
-      if (apiKey.startsWith("AQ.")) {
-        return NextResponse.json(
-          {
-            error:
-              "The provided GEMINI_API_KEY appears to be an OAuth token or invalid credential format (starts with 'AQ.'). Google AI Studio API keys typically start with 'AIzaSy...'. Please update your key in .env.local or in the Model Settings modal.",
+              "GEMINI_API_KEY is missing. Please enter your API key in the Model Settings modal or in .env.local.",
           },
           { status: 400 }
         );

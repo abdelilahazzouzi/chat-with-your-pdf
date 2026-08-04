@@ -47,17 +47,7 @@ If the user asks something outside the scope of the document, politely inform th
         return new Response(
           JSON.stringify({
             error:
-              "GEMINI_API_KEY is missing. Please add a valid Google AI Studio API key starting with 'AIzaSy...' in Cloudflare environment variables or in the Model Settings modal.",
-          }),
-          { status: 400, headers: { "Content-Type": "application/json" } }
-        );
-      }
-
-      if (apiKey.startsWith("AQ.")) {
-        return new Response(
-          JSON.stringify({
-            error:
-              "The provided GEMINI_API_KEY appears to be an OAuth token format (starts with 'AQ.'). Google AI Studio API keys start with 'AIzaSy...'. Please update your key in the Model Settings modal.",
+              "GEMINI_API_KEY is missing. Please add your API key in Cloudflare environment variables or in the Model Settings modal.",
           }),
           { status: 400, headers: { "Content-Type": "application/json" } }
         );
