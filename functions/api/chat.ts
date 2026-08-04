@@ -187,8 +187,12 @@ If the user asks something outside the scope of the document, politely inform th
       apiKey = apiKey || env.QWEN_API_KEY || env.DASHSCOPE_API_KEY;
       endpointUrl = endpointUrl || "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
     } else {
-      apiKey = apiKey || env.OPENAI_API_KEY;
-      endpointUrl = endpointUrl || "https://api.openai.com/v1/chat/completions";
+      apiKey = apiKey || env.OPENAI_API_KEY || env.OPENROUTER_API_KEY;
+      if (!endpointUrl) {
+        endpointUrl = targetModel.includes("/") || targetModel.includes(":free")
+          ? "https://openrouter.ai/api/v1/chat/completions"
+          : "https://api.openai.com/v1/chat/completions";
+      }
     }
 
     if (!apiKey) {
