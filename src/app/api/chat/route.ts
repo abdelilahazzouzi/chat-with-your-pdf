@@ -134,11 +134,21 @@ If the user asks something outside the scope of the document, politely inform th
       }
 
       // If all models failed
-      const rawMsg = lastError?.message || "Failed to generate response with Gemini.";
+      const rawMsg = String(lastError?.message || lastError || "Failed to generate response with Gemini.");
+      
+      if (rawMsg.includes("429") || rawMsg.includes("RESOURCE_EXHAUSTED") || rawMsg.includes("prepayment")) {
+        return NextResponse.json(
+          {
+            error: "Your Gemini Project Prepayment Credits are depleted ($0 balance on paid GCP project). To use Gemini 100% FREE with no credit card: Open https://aistudio.google.com/app/apikey -> Click 'Create API key in NEW project' -> Paste your free key in Model Settings.",
+          },
+          { status: 429 }
+        );
+      }
+
       if (rawMsg.includes("404") || rawMsg.includes("not found")) {
         return NextResponse.json(
           {
-            error: `Google Gemini API returned 404 for model ${targetModel}. Please verify that your GEMINI_API_KEY is valid and has Generative Language API access enabled. Key format: starting with 'AIzaSy...'`,
+            error: `Google Gemini API returned 404 for model ${targetModel}. Please verify that your GEMINI_API_KEY is valid.`,
           },
           { status: 404 }
         );

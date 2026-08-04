@@ -155,6 +155,16 @@ If the user asks something outside the scope of the document, politely inform th
         }
       }
 
+      if (lastErrorText.includes("429") || lastErrorText.includes("RESOURCE_EXHAUSTED") || lastErrorText.includes("prepayment")) {
+        return new Response(
+          JSON.stringify({
+            error:
+              "Your Gemini Project Prepayment Credits are depleted ($0 balance on a paid GCP project). To use Gemini 100% FREE with no credit card: Open https://aistudio.google.com/app/apikey -> Click 'Create API key in NEW project' -> Paste your free key in Model Settings.",
+          }),
+          { status: 429, headers: { "Content-Type": "application/json" } }
+        );
+      }
+
       return new Response(
         JSON.stringify({ error: `Gemini API Error: ${lastErrorText || "Model not available"}` }),
         { status: 500, headers: { "Content-Type": "application/json" } }
